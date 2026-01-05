@@ -1,57 +1,48 @@
-import React, {
-  Dispatch,
-  Ref,
-  RefObject,
-  SetStateAction,
-  useEffect,
-  useRef,
-} from "react";
-import { Canvas, RootState, useFrame } from "@react-three/fiber";
+import React, { Dispatch, RefObject, SetStateAction } from "react";
+import { Canvas } from "@react-three/fiber";
 import ErrorBoundary from "../../singleComponents/ErrorBoundary/ErrorBoundary";
-import useStore from "../../singleComponents/Hooks/useStore";
-import ExampleScene from "../../Home/ExampleScene";
+import { Boids } from "../../canvasElements/boids/Boids";
+import ShaderBg from "../../canvasElements/shaderBg/ShaderBg";
+import CameraRig from "../../canvasElements/CameraRig"; 
+import Post from "../../canvasElements/post/Post";
 import { motion, useAnimationControls } from "framer-motion";
 
-function getMousePos(e: React.MouseEvent<Element, MouseEvent>) {
-  return { x: e.clientX, y: e.clientY };
+// FIXED: Updated types to accept Zustand functions and null refs
+interface CanvasWrapperProps {
+  fwdRef?: RefObject<HTMLDivElement> | null; 
+  canvasLoaded: boolean;
+  setCanvasLoaded: (loaded: boolean) => void; // Changed from Dispatch<SetStateAction<boolean>>
+  faction: "insta_gang" | "insta_parlor" | null;
 }
 
-export default function CanvasWrapper(props: {
-  fwdRef: RefObject<HTMLDivElement | null>;
-  canvasLoaded: boolean;
-  setCanvasLoaded: Dispatch<SetStateAction<boolean>>;
-}) {
-  const GPUTier = useStore((state) => state.GPUTier);
-  const mouse = useRef({ x: 0, y: 0 });
+export default function CanvasWrapper(props: CanvasWrapperProps) {
   const controls = useAnimationControls();
 
-  const onCanvasCreated = (state: RootState) => {
+  const onCanvasCreated = (state: any) => {
     state.gl.physicallyCorrectLights = true;
-    if (state.events.connect) {
+    if (props.fwdRef && props.fwdRef.current && state.events.connect) {
       state.events.connect(props.fwdRef.current);
     }
     props.setCanvasLoaded(true);
+    controls.start({ opacity: 1 });
   };
 
-  useEffect(() => {
-    if (props.canvasLoaded) {
-      controls.start({ opacity: 1, transition: { duration: 3 } });
-    }
-  });
   return (
-    <motion.div
-      className="canvas_wrapper"
-      initial={{ opacity: 0 }}
-      animate={controls}
-    >
-      <ErrorBoundary fallback={<h1>Error</h1>}>
-        <Canvas
-          onMouseMove={(e) => (mouse.current = getMousePos(e))}
-          onCreated={(state) => {
-            onCanvasCreated(state);
-          }}
-        >
-          <ExampleScene />
+    <motion.div className="canvas_wrapper" initial={{ opacity: 0 }} animate={controls}>
+      <ErrorBoundary fallback={null}>
+        <Canvas onCreated={onCanvasCreated} dpr={[1, 2]}>
+          <color attach="background" args={['#1a1a1b']} />
+          
+          <ambientLight intensity={0.4} />
+          <pointLight position={[10, 10, 10]} color="#ff9a9e" intensity={1.5} />
+          
+          <CameraRig />
+
+          {props.faction === 'insta_gang' && <Boids />}
+          {props.faction === 'insta_parlor' && <ShaderBg />}
+
+          <Post />
+          
         </Canvas>
       </ErrorBoundary>
     </motion.div>

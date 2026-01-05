@@ -1,91 +1,105 @@
 import "../styles/globals.scss";
-import "../styles/_grid.scss";
 import type { AppProps } from "next/app";
-import CanvasWrapper from "../components/layouts/canvas/CanvasWrapper";
-import ErrorBoundary from "../components/singleComponents/ErrorBoundary/ErrorBoundary";
-import { useDetectGPU } from "@react-three/drei";
-import useStore from "../components/singleComponents/Hooks/useStore";
-import { useRef, useEffect, useState } from "react";
-import { useSpring } from "react-spring";
-import { useThrottledCallback } from "use-debounce";
-import { getPositions } from "../components/singleComponents/Utils/Utils";
+import dynamic from "next/dynamic";
+import { useEffect, useState, useRef } from "react"; // FIXED: Added useRef
 import { AnimatePresence, motion } from "framer-motion";
+import { onAuthStateChanged } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../components/BubblePop/Auth/firebase"; // Check this path matches your project
+import useStore from "../components/singleComponents/Hooks/useStore";
 import Loader from "../components/singleComponents/loader/Loader";
 
-function MyApp({ Component, pageProps }: AppProps) {
-  // Configuration for GPU Tier system 1-3 is Mobile 4-6 is Desktop.
-  //Higher values have better graphics processing power.
-  //Stored in the global Store to be accesible anywhere
-  const GPUT = useDetectGPU();
-  const GPUTier = GPUT.tier < 1 ? 0 : GPUT.isMobile ? GPUT.tier : GPUT.tier + 3;
-  const setGPU = useStore((state) => state.setGPUTier);
-  const [canvasLoaded, setCanvasLoaded] = useState(false);
+const CanvasWrapper = dynamic(
+  () => import("../components/layouts/canvas/CanvasWrapper"),
+  { ssr: false }
+);
 
-  const fwdRef = useRef<HTMLDivElement>(null); // ref to connect mouse events to the Canvas when Children DOM elements of this element are layerd on top
+function MyApp({ Component, pageProps, router }: AppProps) {
+  const [loading, setLoading] = useState(true);
+  
+  // FIXED: Create a ref to satisfy the CanvasWrapper prop type
+  const fwdRef = useRef<HTMLDivElement>(null);
 
-  // Scroll spring configuration for animating based on scroll
-  const setScrollYGlobal = useStore((state) => state.setScrollY);
+  const setUser = useStore((state) => state.setUser);
+  const setCanvasLoaded = useStore((state) => state.setCanvasLoaded);
+  const canvasLoaded = useStore((state) => state.canvasLoaded);
+  const user = useStore((state) => state.user);
 
-  const options = {
-    mass: 1,
-    tension: 260,
-    friction: 100,
-    precision: 0.0000001,
-    velocity: 0,
-    clamp: true,
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        const docRef = doc(db, "users", currentUser.uid);
+        const docSnap = await getDoc(docRef);
+        
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setUser({
+            uid: currentUser.uid,
+            displayName: data.displayName,
+            faction: data.faction,
+            archetype: data.archetype,
+            joinedAt: data.joinedAt,
+          });
+          if (data.xp) useStore.setState({ xp: data.xp, level: data.level || 1 });
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [setUser]);
+
+  const pageVariants = {
+    initial: { opacity: 0, scale: 0.98 },
+    enter: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: "easeOut" } },
+    exit: { opacity: 0, scale: 1.02, filter: "blur(10px)", transition: { duration: 0.3 } },
   };
 
-  const [{ y }, setScroll] = useSpring(() => ({
-    y: [0],
-    config: options,
-  }));
-
-  setScrollYGlobal(y);
-  setGPU(GPUTier);
-
-  useEffect(() => {
-    setScroll({ config: options });
-  }, [options, setScroll]);
-
-  // Scroll functionality sets the y values to be a spring interpolated normalised value of the scroll
-  const handleScroll = useThrottledCallback(() => {
-    setScroll({
-      y: [window.scrollY / (document.body.offsetHeight - window.screen.height)],
-    });
-  }, 16);
-
-  useEffect(() => {
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
-
   return (
-    <div className="app" ref={fwdRef}>
-      <ErrorBoundary fallback={<h1>Error</h1>}>
-        <CanvasWrapper
-          fwdRef={fwdRef}
-          setCanvasLoaded={setCanvasLoaded}
-          canvasLoaded={canvasLoaded}
-        />
-        <div className="background_div" />
-        <div className="dom">
-          <AnimatePresence>
-            {canvasLoaded ? (
+    <div className="app-shell" ref={fwdRef} style={{ position: 'relative', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+      
+      <CanvasWrapper
+        fwdRef={fwdRef} 
+        setCanvasLoaded={setCanvasLoaded}
+        canvasLoaded={canvasLoaded}
+        faction={user?.faction || null}
+      />
+
+      <div 
+        className="ui-layer" 
+        style={{ 
+          position: 'absolute', 
+          top: 0, left: 0, 
+          width: '100%', height: '100%', 
+          zIndex: 10,
+          pointerEvents: 'none' 
+        }}
+      >
+        <AnimatePresence mode="wait">
+          {(!canvasLoaded || loading) ? (
+            <motion.div
+              key="loader"
+              initial={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              style={{ pointerEvents: 'auto' }}
+            >
+              <Loader />
+            </motion.div>
+          ) : (
+            <motion.div
+              key={router.route}
+              variants={pageVariants}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              style={{ width: '100%', height: '100%', pointerEvents: 'auto' }}
+            >
               <Component {...pageProps} />
-            ) : (
-              <motion.div
-                className="preloader_wrapper"
-                initial={{ opacity: 1 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0, transition: { duration: 3 } }}
-                key="wrapper"
-              >
-                <Loader />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </ErrorBoundary>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
     </div>
   );
 }

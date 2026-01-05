@@ -2,22 +2,11 @@ import React from "react";
 
 export default function Loader() {
   return (
-    <div>
-      <div className="container">
-        <div className="container_inner">
-          <div className="Loader"></div>
-          <div style={{ alignSelf: "flex-end" }}>
-            <h2>
-              <span className="let1">l</span>
-              <span className="let2">o</span>
-              <span className="let3">a</span>
-              <span className="let4">d</span>
-              <span className="let5">i</span>
-              <span className="let6">n</span>
-              <span className="let7">g</span>
-            </h2>
-          </div>
-        </div>
+    <div className="loader_background flex-middle" style={{height: '100vh', width: '100vw'}}>
+      <div className="Loader">
+        <h1 style={{fontSize: '1rem', letterSpacing: '0.5rem', color: 'var(--bubble-peach)'}}>
+          POPPING...
+        </h1>
       </div>
     </div>
   );

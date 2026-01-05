@@ -1,5 +1,6 @@
 import { Archetype, IEntity } from "miniplex";
 
+// Helper 1: Generic System Generator
 export const system =
   <TEntity extends IEntity = IEntity, TArgs extends any[] = any[]>(
     archetype: Archetype<TEntity>,
@@ -8,6 +9,7 @@ export const system =
   (...args: TArgs) =>
     fun(archetype.entities, ...args);
 
+// Helper 2: Batched System Generator (Optimized for 800k users scale)
 export const batchedSystem = <
   TEntity extends IEntity = IEntity,
   TArgs extends any[] = any[]
@@ -20,8 +22,14 @@ export const batchedSystem = <
   const { entities } = archetype;
 
   return (...args: TArgs) => {
-    const batch = entities.slice(offset, offset + batchSize);
+    // Safety check if entities are empty
+    if (entities.length === 0) return;
+
+    const end = Math.min(offset + batchSize, entities.length);
+    const batch = entities.slice(offset, end);
+    
     fun(batch, ...args);
-    offset = (offset + batch.length) % (entities.length || 1);
+    
+    offset = (offset + batch.length) % entities.length;
   };
 };

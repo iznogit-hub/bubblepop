@@ -4,33 +4,31 @@ import {
   Bloom,
   HueSaturation,
   BrightnessContrast,
-  Noise,
+  Vignette
 } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
-import { useControls } from "leva";
 
 export default function Post() {
-  const options = useControls("post", {
-    hue: { min: -6, max: 6, value: 0, step: 0.1 },
-    saturation: { min: -1, max: 1, value: 0, step: 0.05 },
-    brightness: { min: -1, max: 1, value: 0, step: 0.05 },
-    contrast: { min: -1, max: 1, value: 0, step: 0.05 },
-  });
   return (
-    <EffectComposer stencilBuffer>
-      {/* <Bloom luminanceThreshold={0} luminanceSmoothing={0.9} height={300} /> */}
+    <EffectComposer disableNormalPass>
+      <Bloom 
+        luminanceThreshold={0.2} 
+        mipmapBlur 
+        intensity={0.5} 
+        radius={0.4} 
+      />
       <HueSaturation
-        blendFunction={BlendFunction.NORMAL} // blend mode
-        hue={options.hue} // hue in radians
-        saturation={options.saturation} // saturation in radians
+        hue={0} 
+        saturation={0.1} // Slight boost for the peachy hues
       />
       <BrightnessContrast
-        brightness={options.brightness} // brightness. min: -1, max: 1
-        contrast={options.contrast} // contrast: min -1, max: 1
+        brightness={-0.05} // Darker Obsidian feel
+        contrast={0.1} 
       />
-      <Noise
-        premultiply // enables or disables noise premultiplication
-        blendFunction={BlendFunction.SCREEN} // blend mode
+      <Vignette
+        eskil={false}
+        offset={0.5}
+        darkness={0.5}
       />
     </EffectComposer>
   );
